@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-
+import uvicorn
 from app.dependencies.database_init import init_db
 from app.core.exception_handlers import register_exception_handlers
 from app.routers.admin_media_router import router as admin_media_router
@@ -72,3 +72,7 @@ app.include_router(feature_router)
 
 app.include_router(admin_router)
 app.include_router(admin_update_router)
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
