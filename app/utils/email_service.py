@@ -1,3 +1,7 @@
+import os
+import smtplib
+from email.mime.text import MIMEText
+
 def send_otp_email(to_email, otp):
     EMAIL = os.getenv("EMAIL")
     EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
@@ -22,3 +26,4 @@ def send_otp_email(to_email, otp):
 
     except Exception as e:
         print("❌ Email Error:", e)
+
