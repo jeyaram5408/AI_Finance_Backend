@@ -12,7 +12,7 @@ def send_otp_email(to_email, otp):
     msg["To"] = to_email
 
     try:
-        server = smtplib.SMTP("smtp-relay.brevo.com", 587)
+        server = smtplib.SMTP("smtp.gmail.com", 587)
         server.starttls()
         server.login(EMAIL, EMAIL_PASSWORD)
         server.send_message(msg)
