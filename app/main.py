@@ -1,4 +1,6 @@
 import os
+from dotenv import load_dotenv
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -30,17 +32,17 @@ from app.routers.admin_router import router as admin_router
 from app.routers.admin_update import router as admin_update_router
 
 app = FastAPI(title="AI Finance Advisor API", version="1.0.0")
-
+load_dotenv() 
 register_exception_handlers(app)
 frontend_url = os.getenv("FRONTEND_URL")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_url],
+    allow_origins=[frontend_url] if frontend_url else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # os.makedirs("uploads/profile", exist_ok=True)
 # app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
