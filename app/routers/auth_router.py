@@ -45,10 +45,6 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
     if await get_user_by_email(db, user.email):
         raise HTTPException(status_code=400, detail="User already exists")
 
-    # Password check
-    if not user.password:
-        raise HTTPException(status_code=400, detail="Password required")
-
     # Create user
     new_user = await create_user(
         db,
@@ -58,16 +54,21 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
         "local"
     )
 
+    # ✅ commit first to get ID
+    await db.commit()
+    await db.refresh(new_user)
+
+    # ✅ Now generate user_id
     new_user.user_id = f"AFA{new_user.id:02d}"
 
-    # ✅ Generate OTP
+    # Generate OTP
     otp = generate_otp()
     new_user.otp_code = otp
     new_user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
 
     await db.commit()
 
-    # ✅ Send OTP mail
+    # Send OTP
     send_otp_email(new_user.email, otp)
 
     return {
