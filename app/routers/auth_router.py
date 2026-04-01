@@ -41,40 +41,44 @@ CLIENT_ID = "760648200997-qn0crdqlfjjve86hh6f54f0na48e11mr.apps.googleuserconten
 @router.post("/register")
 async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
 
-    # Check existing user
-    if await get_user_by_email(db, user.email):
-        raise HTTPException(status_code=400, detail="User already exists")
+    try:
+        # Check existing user
+        if await get_user_by_email(db, user.email):
+            raise HTTPException(status_code=400, detail="User already exists")
 
-    # Create user
-    new_user = await create_user(
-        db,
-        user.name,
-        user.email,
-        user.password,
-        "local"
-    )
+        # Create user
+        new_user = await create_user(
+            db,
+            user.name,
+            user.email,
+            user.password,
+            "local"
+        )
 
-    # ✅ commit first to get ID
-    await db.commit()
-    await db.refresh(new_user)
+        # Commit to get ID
+        await db.commit()
+        await db.refresh(new_user)
 
-    # ✅ Now generate user_id
-    new_user.user_id = f"AFA{new_user.id:02d}"
+        # Generate user ID
+        new_user.user_id = f"AFA{new_user.id:02d}"
 
-    # Generate OTP
-    otp = generate_otp()
-    new_user.otp_code = otp
-    new_user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
+        # OTP
+        otp = generate_otp()
+        new_user.otp_code = otp
+        new_user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
 
-    await db.commit()
+        await db.commit()
 
-    # Send OTP
-    send_otp_email(new_user.email, otp)
+        send_otp_email(new_user.email, otp)
 
-    return {
-        "success": True,
-        "message": "OTP sent to your email"
-    }
+        return {
+            "success": True,
+            "message": "OTP sent"
+        }
+
+    except Exception as e:
+        print("REGISTER ERROR:", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 # =========================================================
 # 🔹 VERIFY OTP
