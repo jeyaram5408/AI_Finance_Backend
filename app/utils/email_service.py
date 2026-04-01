@@ -1,26 +1,24 @@
 import os
-import resend
+import smtplib
+from email.mime.text import MIMEText
 
-def send_otp_email(to_email: str, otp: str):
+def send_otp_email(to_email, otp):
+    EMAIL = os.getenv("EMAIL")          # your email
+    EMAIL_PASSWORD = os.getenv("EMAIL.PASSWORD")  # SMTP key
+
+    msg = MIMEText(f"Your OTP is {otp}")
+    msg["Subject"] = "OTP Verification"
+    msg["From"] = EMAIL
+    msg["To"] = to_email
+
     try:
-        # ✅ Always set API key inside function
-        resend.api_key = os.getenv("RESEND_API_KEY")
+        server = smtplib.SMTP("smtp-relay.brevo.com", 587)
+        server.starttls()
+        server.login(EMAIL, EMAIL_PASSWORD)
+        server.send_message(msg)
+        server.quit()
 
-        print("API KEY:", resend.api_key)  # debug
-
-        response = resend.Emails.send({
-            "from": "onboarding@resend.dev",
-            "to": [to_email],   # ⚠️ IMPORTANT: list format
-            "subject": "Your Verification Code",
-            "html": f"""
-            <h2>AI Finance App 🔐</h2>
-            <p>Your verification code is:</p>
-            <h1>{otp}</h1>
-            <p>This code expires in 5 minutes</p>
-            """
-        })
-
-        print("EMAIL SUCCESS:", response)
+        print("✅ Email Sent Successfully")
 
     except Exception as e:
-        print("EMAIL ERROR:", str(e))
+        print("❌ Email Error:", e)
