@@ -5,8 +5,8 @@ import os
 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-EMAIL = os.getenv("Email")
-PASSWORD = os.getenv("Email_Password")
+EMAIL = os.getenv("EMAIL")
+PASSWORD = os.getenv("EMAIL_PASSWORD")
 
 def send_otp_email(to_email: str, otp: str):
     msg = MIMEMultipart("alternative")
