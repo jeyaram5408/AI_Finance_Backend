@@ -34,7 +34,7 @@ from app.routers.admin_update import router as admin_update_router
 app = FastAPI(title="AI Finance Advisor API", version="1.0.0")
 load_dotenv() 
 register_exception_handlers(app)
-frontend_url = os.getenv("FRONTEND_URL")
+frontend_url = os.getenv("FRONTEND_URL", "https://frontend-afa.onrender.com")
 
 app.add_middleware(
     CORSMiddleware,
