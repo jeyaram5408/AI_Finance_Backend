@@ -32,10 +32,10 @@ from app.routers.admin_update import router as admin_update_router
 app = FastAPI(title="AI Finance Advisor API", version="1.0.0")
 
 register_exception_handlers(app)
-
+frontend_url = os.getenv("FRONTEND_URL")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[frontend_url],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
