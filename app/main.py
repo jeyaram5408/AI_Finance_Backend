@@ -53,7 +53,9 @@ os.makedirs("uploads/profile", exist_ok=True)
 os.makedirs("uploads/admin_media", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-
+@app.get("/")
+def root():
+    return {"message": "API is running"}
 
 @app.on_event("startup")
 async def startup():
