@@ -86,7 +86,7 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
 @router.post("/verify-otp")
 async def verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
 
-    user = await get_user_by_email(db, data.email.lower())
+    user = await get_user_by_email(db, data.email)
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -94,19 +94,18 @@ async def verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
     if user.otp_code != data.otp:
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
-    if user.otp_expiry < datetime.utcnow():
+    if datetime.utcnow() > user.otp_expiry:
         raise HTTPException(status_code=400, detail="OTP expired")
 
-    # ✅ SUCCESS
-    user.is_verified = True
+    # ✅ Activate user
+    user.is_active = True
     user.otp_code = None
-    user.otp_expiry = None
 
     await db.commit()
 
     return {
         "success": True,
-        "message": "Email verified successfully"
+        "message": "OTP verified successfully"
     }
 # =========================================================
 # 🔹 LOGIN
