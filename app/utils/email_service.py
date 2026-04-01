@@ -4,7 +4,7 @@ from email.mime.text import MIMEText
 
 def send_otp_email(to_email, otp):
     EMAIL = os.getenv("EMAIL")          # your email
-    EMAIL_PASSWORD = os.getenv("EMAIL.PASSWORD")  # SMTP key
+    EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")  # SMTP key
 
     msg = MIMEText(f"Your OTP is {otp}")
     msg["Subject"] = "OTP Verification"
