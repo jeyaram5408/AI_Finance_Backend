@@ -38,7 +38,7 @@ frontend_url = os.getenv("FRONTEND_URL", "https://frontend-afa.onrender.com")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_url] if frontend_url else ["*"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
