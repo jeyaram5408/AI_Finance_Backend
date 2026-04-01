@@ -1,14 +1,10 @@
-import os
-import smtplib
-from email.mime.text import MIMEText
-
 def send_otp_email(to_email, otp):
-    # SMTP credentials (Brevo)
-    EMAIL = os.getenv("EMAIL")  # a6dea6001@smtp-brevo.com
-    EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")  # SMTP Key
+    EMAIL = os.getenv("EMAIL")
+    EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+    SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 
-    # Verified sender email (important)
-    SENDER_EMAIL = os.getenv("SENDER_EMAIL")  # jeyaram5408@gmail.com
+    print("EMAIL:", EMAIL)
+    print("SENDER:", SENDER_EMAIL)
 
     msg = MIMEText(f"Your OTP is {otp}")
     msg["Subject"] = "OTP Verification"
@@ -16,9 +12,9 @@ def send_otp_email(to_email, otp):
     msg["To"] = to_email
 
     try:
-        server = smtplib.SMTP("smtp-relay.brevo.com", 587)  # ✅ correct server
+        server = smtplib.SMTP("smtp-relay.brevo.com", 587)
         server.starttls()
-        server.login(EMAIL, EMAIL_PASSWORD)  # ✅ login with SMTP login
+        server.login(EMAIL, EMAIL_PASSWORD)
         server.send_message(msg)
         server.quit()
 
