@@ -1,29 +1,28 @@
+import requests
 import os
-import smtplib
-from email.mime.text import MIMEText
 
 def send_otp_email(to_email, otp):
-    EMAIL = os.getenv("EMAIL")
-    EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+    API_KEY = os.getenv("BREVO_API_KEY")
     SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 
-    print("EMAIL:", EMAIL)
-    print("SENDER:", SENDER_EMAIL)
+    url = "https://api.brevo.com/v3/smtp/email"
 
-    msg = MIMEText(f"Your OTP is {otp}")
-    msg["Subject"] = "OTP Verification"
-    msg["From"] = SENDER_EMAIL
-    msg["To"] = to_email
+    payload = {
+        "sender": {"email": SENDER_EMAIL},
+        "to": [{"email": to_email}],
+        "subject": "OTP Verification",
+        "htmlContent": f"<h3>Your OTP is: {otp}</h3>"
+    }
+
+    headers = {
+        "accept": "application/json",
+        "api-key": API_KEY,
+        "content-type": "application/json"
+    }
 
     try:
-        server = smtplib.SMTP("smtp-relay.brevo.com", 587)
-        server.starttls()
-        server.login(EMAIL, EMAIL_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-
-        print("✅ Email Sent Successfully")
-
+        response = requests.post(url, json=payload, headers=headers)
+        print("STATUS:", response.status_code)
+        print("RESPONSE:", response.text)
     except Exception as e:
-        print("❌ Email Error:", e)
-
+        print("EMAIL ERROR:", e)
