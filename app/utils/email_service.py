@@ -1,21 +1,38 @@
-import smtplib
-from email.mime.text import MIMEText
+import requests
+import os
 
 def send_otp_email(to_email, otp):
-    sender = "jeyaram5408@gmail.com"
-    app_password = "uvmu utgn szdc wexa"
+    API_KEY = os.getenv("RESEND_API_KEY")
+    FROM_EMAIL = os.getenv("FROM_EMAIL")
 
-    msg = MIMEText(f"Your OTP is {otp}")
-    msg["Subject"] = "OTP Verification"
-    msg["From"] = sender
-    msg["To"] = to_email
+    url = "https://api.resend.com/emails"
+
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "from": FROM_EMAIL,
+        "to": [to_email],
+        "subject": "OTP Verification",
+        "html": f"""
+        <h2>OTP Verification</h2>
+        <h1>{otp}</h1>
+        <p>Valid for 5 minutes</p>
+        """
+    }
 
     try:
-        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
-        server.login(sender, app_password)
-        server.send_message(msg)
-        server.quit()
-        return True
+        res = requests.post(url, json=payload, headers=headers)
+
+        if res.status_code == 200:
+            print("EMAIL SENT ✅")
+            return True
+        else:
+            print("FAILED:", res.text)
+            return False
+
     except Exception as e:
-        print("EMAIL ERROR:", e)
+        print("ERROR:", e)
         return False
