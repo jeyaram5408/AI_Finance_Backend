@@ -8,7 +8,7 @@ from app.core.security import (
     create_refresh_token,
     decode_token
 )
-
+import os
 
 from datetime import datetime, timedelta
 from app.core.security import generate_otp,decode_refresh_token
@@ -31,8 +31,8 @@ router = APIRouter(prefix="/authentication", tags=["Authentication"])
 # 🔐 Used refresh tokens (basic blacklist)
 REFRESH_TOKEN_BLACKLIST = set()
 
-# 🔑 Google Client ID
-CLIENT_ID = "760648200997-qn0crdqlfjjve86hh6f54f0na48e11mr.apps.googleusercontent.com"
+# Google Client ID
+CLIENT_ID = os.getenv("CLIENT_ID")
 
 
 # =========================================================
