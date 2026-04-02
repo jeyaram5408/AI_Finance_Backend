@@ -44,6 +44,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 register_exception_handlers(app)
 
 # os.makedirs("uploads/profile", exist_ok=True)
