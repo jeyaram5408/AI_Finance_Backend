@@ -5,7 +5,9 @@ def send_otp_email(to_email, otp):
     API_KEY = os.getenv("RESEND_API_KEY")
     FROM_EMAIL = os.getenv("FROM_EMAIL")
 
-    url = "https://api.resend.com/emails"
+    if not API_KEY or not FROM_EMAIL:
+        print("Missing API KEY or FROM EMAIL")
+        return False
 
     headers = {
         "Authorization": f"Bearer {API_KEY}",
@@ -13,7 +15,7 @@ def send_otp_email(to_email, otp):
     }
 
     payload = {
-        "from": FROM_EMAIL,
+        "from": f"Finance AI <{FROM_EMAIL}>",  # ✅ FIX HERE
         "to": [to_email],
         "subject": "OTP Verification",
         "html": f"""
@@ -23,16 +25,13 @@ def send_otp_email(to_email, otp):
         """
     }
 
-    try:
-        res = requests.post(url, json=payload, headers=headers)
+    res = requests.post(
+        "https://api.resend.com/emails",
+        json=payload,
+        headers=headers
+    )
 
-        if res.status_code == 200:
-            print("EMAIL SENT ✅")
-            return True
-        else:
-            print("FAILED:", res.text)
-            return False
+    print("EMAIL STATUS:", res.status_code)
+    print("EMAIL RESPONSE:", res.text)
 
-    except Exception as e:
-        print("ERROR:", e)
-        return False
+    return res.status_code in [200, 202]
