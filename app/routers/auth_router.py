@@ -97,9 +97,11 @@ async def verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
     if datetime.utcnow() > user.otp_expiry:
         raise HTTPException(status_code=400, detail="OTP expired")
 
-    # ✅ Activate user
+    # ✅ FIX HERE
     user.is_active = True
+    user.is_verified = True   # ⭐ IMPORTANT LINE
     user.otp_code = None
+    user.otp_expiry = None
 
     await db.commit()
 
