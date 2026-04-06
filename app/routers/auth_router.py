@@ -28,11 +28,11 @@ from app.schemas.auth_schemas import (
     ResetPasswordRequest,
 )
 from app.utils.email_service import send_otp_email
-
+from app.core.config import CLIENT_ID
 
 router = APIRouter(prefix="/authentication", tags=["Authentication"])
 
-CLIENT_ID = os.getenv("CLIENT_ID")
+# CLIENT_ID = os.getenv("CLIENT_ID")
 
 
 # -------------------- HELPERS --------------------

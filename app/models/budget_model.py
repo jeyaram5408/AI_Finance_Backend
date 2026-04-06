@@ -3,7 +3,7 @@ from app.dependencies.database import Base
 
 
 class Budget(Base):
-    __tablename__ = "budgets"   # ⚠️ MUST match ForeignKey
+    __tablename__ = "budgets"   
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("user_table.id"), nullable=False)
