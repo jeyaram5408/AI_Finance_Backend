@@ -41,15 +41,25 @@ app = FastAPI(title="AI Finance Advisor API")
 
 
 
-frontend_url = FRONTEND_URL or "http://localhost:5173"
+frontend_url = (FRONTEND_URL or "").strip()
+
+origins = [
+    "http://localhost:5173",
+    frontend_url
+]
+
+print("🔥 FRONTEND URL:", frontend_url)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_url],
+    allow_origins=[origin for origin in origins if origin],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+@app.options("/{full_path:path}")
+async def preflight_handler(full_path: str):
+    return {"message": "OK"}
 
 register_exception_handlers(app)
 
