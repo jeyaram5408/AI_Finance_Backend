@@ -403,7 +403,7 @@ async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(
     if not user.otp_expiry or datetime.now(timezone.utc) > user.otp_expiry:
         raise HTTPException(status_code=400, detail="OTP expired")
 
-    if not verify_password(data.otp, user.otp_code):
+    if not verify_otp(data.otp, user.otp_code):
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
     user.password = hash_password(data.new_password)
