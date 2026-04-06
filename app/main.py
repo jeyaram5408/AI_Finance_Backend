@@ -82,7 +82,6 @@ async def startup():
 
 app.include_router(auth_router.router)
 app.include_router(transaction_routes.router)
-app.include_router(category_router)
 app.include_router(report_routes.router)
 app.include_router(forecast_router.router)
 app.include_router(dashboard_routes.router)
