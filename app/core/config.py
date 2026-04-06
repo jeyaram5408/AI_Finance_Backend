@@ -16,3 +16,4 @@ print(f"🔥 CONFIG ENV: {ENV}")
 
 FRONTEND_URL = os.getenv("FRONTEND_URL")
 DATABASE_URL = os.getenv("DATABASE_URL")
+CLIENT_ID = os.getenv("CLIENT_ID")
