@@ -147,12 +147,13 @@ async def verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
+    # ✅ FIX: define otp_expiry properly
+    otp_expiry = user.otp_expiry
+
     if otp_expiry and otp_expiry.tzinfo is None:
         otp_expiry = otp_expiry.replace(tzinfo=timezone.utc)
-    
 
-        # FIXED ORDER (expiry first)
     if not otp_expiry or datetime.now(timezone.utc) > otp_expiry:
         raise HTTPException(status_code=400, detail="OTP expired")
 
@@ -168,7 +169,6 @@ async def verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     return {"success": True, "message": "OTP verified successfully"}
-
 
 # -------------------- LOGIN --------------------
 
