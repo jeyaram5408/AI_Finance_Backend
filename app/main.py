@@ -36,7 +36,7 @@ from app.routers.api_protection import router as api_protection_router
 # ENV = os.getenv("ENV", "local")
 # load_dotenv(".env" if ENV == "production" else ".env.local")
 
-app = FastAPI(title="AI Finance Advisor API")
+app = FastAPI(title="AI Finance Advisor API", redirect_slashes=True)
 
 
 
