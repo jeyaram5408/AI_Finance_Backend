@@ -7,7 +7,7 @@ class TokenResponse(BaseModel):
 
 
 class UserLogin(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 class ForgotPasswordRequest(BaseModel):

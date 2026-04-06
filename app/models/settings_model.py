@@ -17,7 +17,7 @@ class UserSettingsClass(Base, AsyncAttrs):
         index=True
     )
 
-    default_currency = Column(String(10), nullable=False, default="USD")
+    currency = Column(String(10), nullable=True)
     monthly_budget = Column(Float, nullable=True)
 
     email_notifications = Column(Boolean, default=True)

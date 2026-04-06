@@ -36,10 +36,20 @@ def calculate_forecast(monthly_data):
         }
 
     values = [m["total_expense"] for m in monthly_data]
+
     avg = sum(values) / len(values)
+
+    # trend calculation
+    if len(values) >= 2:
+        trend = values[-1] - values[-2]
+    else:
+        trend = 0
+
+    next_month = values[-1] + trend
+    six_month = next_month * 6
 
     return {
         "monthly_avg": avg,
-        "next_month": avg,
-        "six_month": avg * 6
+        "next_month": next_month,
+        "six_month": six_month
     }

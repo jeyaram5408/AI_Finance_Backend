@@ -14,4 +14,5 @@ class AdminLog(Base):
     target_type = Column(String(50), nullable=True)
     target_id = Column(Integer, nullable=True)
     description = Column(String(500), nullable=True)
+    admin_code = Column(String(20), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

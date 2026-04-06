@@ -191,7 +191,8 @@ class UserUpdate(BaseModel):
     def validate_phone(cls, v):
         if v is None:
             return None
-        if len(v) < 10:
+        if not v.isdigit() or len(v) != 10:
+
             raise ValueError("Phone number must be at least 10 digits")
         return v
 

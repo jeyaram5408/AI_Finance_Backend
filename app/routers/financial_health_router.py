@@ -1,82 +1,47 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from collections import defaultdict
-from statistics import pstdev
-from datetime import datetime
-from groq import Groq
 
 from app.dependencies.db import get_db
 from app.dependencies.auth_dependency import get_current_user
 from app.models.transaction_model import Transaction
 from app.models.user_table_model import UserTableClass
 
+from sqlalchemy import select
+from collections import defaultdict
+from statistics import pstdev
+from datetime import datetime
+
+import google.generativeai as genai
 import os
 import json
 import re
 
-
 router = APIRouter(prefix="/financial-health", tags=["Financial Health"])
 
 # ─────────────────────────────────────────────────────────────
-# GROQ INIT
+# GEMINI INIT
 # ─────────────────────────────────────────────────────────────
-api_key = os.getenv("GROQ_API_KEY")
+api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
-    raise ValueError("GROQ_API_KEY not set")
+    raise ValueError("GEMINI_API_KEY not set in environment variables")
 
-client = Groq(api_key=api_key)
-
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 # ─────────────────────────────────────────────────────────────
 # CATEGORY RULES
 # ─────────────────────────────────────────────────────────────
 WANTS_KEYWORDS = {
-    "shopping",
-    "entertainment",
-    "movie",
-    "movies",
-    "food",
-    "dining",
-    "restaurant",
-    "travel",
-    "trip",
-    "luxury",
-    "subscriptions",
-    "subscription",
-    "games",
-    "gaming",
-    "swiggy",
-    "zomato",
-    "fun",
-    "outing",
-    "snacks",
-    "cafe",
+    "shopping", "entertainment", "movie", "movies", "food", "dining",
+    "restaurant", "travel", "trip", "luxury", "subscriptions", "subscription",
+    "games", "gaming", "swiggy", "zomato", "fun", "outing", "snacks", "cafe",
 }
 
 NEEDS_KEYWORDS = {
-    "rent",
-    "emi",
-    "loan",
-    "groceries",
-    "grocery",
-    "medical",
-    "medicine",
-    "insurance",
-    "electricity",
-    "water",
-    "fuel",
-    "petrol",
-    "diesel",
-    "transport",
-    "internet",
-    "wifi",
-    "education",
-    "school",
-    "college",
-    "hospital",
-    "utility",
-    "utilities",
+    "rent", "emi", "loan", "groceries", "grocery", "medical", "medicine",
+    "insurance", "electricity", "water", "fuel", "petrol", "diesel",
+    "transport", "internet", "wifi", "education", "school", "college",
+    "hospital", "utility", "utilities",
 }
 
 
@@ -125,11 +90,6 @@ def safe_date_key(dt_obj):
 
 
 def get_transaction_owner_field():
-    """
-    Supports both:
-    # - Transaction.user_id
-    - Transaction.usertable_id
-    """
     if hasattr(Transaction, "user_id"):
         return getattr(Transaction, "user_id")
     if hasattr(Transaction, "usertable_id"):
@@ -163,13 +123,8 @@ def build_monthly_series(transactions):
 
 
 def compute_stability_score(monthly_expense_series):
-    """
-    Expense stability score /10
-    Lower fluctuation = better score
-    """
     if not monthly_expense_series:
         return 5, 0
-
     if len(monthly_expense_series) == 1:
         return 6, 0
 
@@ -196,7 +151,6 @@ def compute_financial_health(
     savings_goal: float | None,
     monthly_expense_series: list[float] | None = None,
 ):
-    # income priority: transaction income > profile income
     income = transaction_income if transaction_income > 0 else (profile_income or 0)
 
     savings = income - expense
@@ -281,7 +235,7 @@ def compute_financial_health(
         else:
             goal_score = 0
     else:
-        goal_score = 5  # neutral if no goal set
+        goal_score = 5
 
     # 6) Expense Stability /10
     stability_score, expense_volatility = compute_stability_score(monthly_expense_series or [])
@@ -296,7 +250,6 @@ def compute_financial_health(
     )
     base_score = int(clamp(round(base_score), 0, 100))
 
-    # conservative penalty if income exists but no expense data at all
     data_confidence = "high"
     if income > 0 and expense == 0:
         base_score = min(base_score, 55)
@@ -403,11 +356,7 @@ async def get_financial_health(
                 ],
                 "score_breakdown": {},
                 "category_breakdown": {},
-                "budget_50_30_20": {
-                    "needs": 0,
-                    "wants": 0,
-                    "savings": 0,
-                }
+                "budget_50_30_20": {"needs": 0, "wants": 0, "savings": 0}
             }
         }
 
@@ -491,7 +440,7 @@ Rules:
 - ai_adjustment must be an integer between -5 and +5
 - Use actual category names where relevant
 - Keep suggestions practical and specific
-- No markdown
+- No markdown, return pure JSON only
 """
 
     ai_data = {
@@ -504,12 +453,8 @@ Rules:
     }
 
     try:
-        response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-        )
-        raw = response.choices[0].message.content.strip()
+        response = model.generate_content(prompt)
+        raw = response.text.strip()
         parsed = extract_json(raw)
 
         if isinstance(parsed, dict):
@@ -522,7 +467,7 @@ Rules:
                 "adjustment_reason": parsed.get("adjustment_reason", ""),
             }
     except Exception as e:
-        print("🔥 Groq Financial Health Error:", e)
+        print("🔥 Gemini Financial Health Error:", e)
 
     try:
         ai_adjustment = int(ai_data.get("ai_adjustment", 0))

@@ -1,5 +1,6 @@
 from datetime import datetime
 from collections import defaultdict
+from passlib.context import CryptContext
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -13,10 +14,11 @@ from app.models.user_table_model import UserTableClass
 from app.models.transaction_model import Transaction
 from app.models.category_model import Category
 from app.models.admin_log_model import AdminLog
+from app.schemas.admin_schema import AdminUserRoleUpdate
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
-
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # ─────────────────────── Pydantic Models ───────────────────────
 
 class UserStatusUpdate(BaseModel):
@@ -33,6 +35,12 @@ class CategoryUpdatePayload(BaseModel):
     type: str | None = None
 
 
+class AdminCreatePayload(BaseModel):
+    name: str
+    email: str
+    password: str    
+
+
 # ─────────────────────── Helper: Add Log ───────────────────────
 
 async def add_admin_log(
@@ -44,7 +52,8 @@ async def add_admin_log(
     description: str | None = None,
 ):
     log = AdminLog(
-        admin_id=admin.id if admin else None,
+        admin_id = admin.id    ,   
+        admin_code=admin.admin_code,
         action=action,
         target_type=target_type,
         target_id=target_id,
@@ -101,6 +110,53 @@ async def get_admin_stats(
 
 
 # ═══════════════════════ USERS ═══════════════════════
+
+
+@router.post("/create-admin")
+async def create_admin(
+    payload: AdminCreatePayload,
+    secret_key: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if secret_key != "my_super_secret_123":
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+    result = await db.execute(
+        select(UserTableClass).where(UserTableClass.email == payload.email)
+    )
+    existing_user = result.scalar_one_or_none()
+
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already exists")
+
+    hashed_password = pwd_context.hash(payload.password)
+
+    new_admin = UserTableClass(
+        name=payload.name.strip(),
+        email=payload.email.strip().lower(),
+        password=hashed_password,
+        role="admin",
+        is_active=True,
+        is_verified=True,
+    )
+
+    db.add(new_admin)
+  
+    await db.flush()
+
+# user_id (already)
+    new_admin.user_id = f"AFA{new_admin.id:02d}"
+
+# ✅ admin_code
+    new_admin.admin_code = f"ADM{new_admin.id:02d}"
+    await db.commit()
+    await db.refresh(new_admin)
+
+    return {
+        "success": True,
+        "admin_id": new_admin.id,
+        "message": "Admin created successfully",
+    }
 
 @router.get("/users")
 async def get_admin_users(
@@ -240,6 +296,57 @@ async def update_user_status(
 
     return {"success": True, "message": "User status updated", "user_id": user.id, "is_active": user.is_active}
 
+@router.patch("/users/{user_id}/role")
+async def update_user_role(
+    user_id: int,
+    payload: AdminUserRoleUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_admin: UserTableClass = Depends(require_admin),
+):
+    user = await db.get(UserTableClass, user_id)
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if user.id == current_admin.id:
+        raise HTTPException(status_code=400, detail="Cannot change your own role")
+
+    new_role = payload.role.lower()
+
+    if new_role not in ["user", "admin"]:
+        raise HTTPException(status_code=400, detail="Invalid role")
+
+    old_role = user.role
+    user.role = new_role
+
+    await db.commit()
+    await db.refresh(user)
+
+    await add_admin_log(
+        db,
+        current_admin,
+        "UPDATE_USER_ROLE",
+        "user",
+        user.id,
+        f"Changed role from {old_role} to {new_role}",
+    )
+
+    return {
+        "success": True,
+        "message": f"User role updated to {new_role}",
+    }
+
+@router.get("/admins")
+async def get_admins(
+    db: AsyncSession = Depends(get_db),
+    current_admin: UserTableClass = Depends(require_admin),
+):
+    result = await db.execute(
+        select(UserTableClass).where(func.lower(UserTableClass.role) == "admin")
+    )
+    admins = result.scalars().all()
+
+    return admins
 
 @router.delete("/users/{user_id}")
 async def admin_delete_user(

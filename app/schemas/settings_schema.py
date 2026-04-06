@@ -12,14 +12,14 @@ class SettingsUpdate(BaseModel):
     password: str | None = None
 
     # app settings
-    default_currency: str | None = None
+    currency: str | None = None
     monthly_budget: float | None = None
 
     email_notifications: bool | None = None
     push_notifications: bool | None = None
     budget_alerts: bool | None = None
 
-    @field_validator("name", "phone_number", "password", "default_currency","email", mode="before")
+    @field_validator("name", "phone_number", "password", "currency","email", mode="before")
     @classmethod
     def clean_strings(cls, v):
         if v is None:
@@ -35,7 +35,7 @@ class SettingsUpdate(BaseModel):
     def validate_phone(cls, v):
         if v is None:
             return v
-        if len(v) < 10:
+        if not v.isdigit() or len(v) != 10:
             raise ValueError("Phone number must be at least 10 digits")
         return v
 
@@ -59,7 +59,7 @@ class SettingsUpdate(BaseModel):
 
         return v
 
-    @field_validator("default_currency")
+    @field_validator("currency")
     @classmethod
     def validate_currency(cls, v):
         if v is None:

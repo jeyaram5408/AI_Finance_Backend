@@ -12,6 +12,8 @@ class UserTableClass(Base, AsyncAttrs):
     user_id = Column(String(100), nullable=True, unique=True)
     profile_picture = Column(String(500), nullable=True)
 
+    admin_code = Column(String(20), unique=True, nullable=True)
+
     name = Column(String(100), nullable=False)
     phone_number = Column(String(15), nullable=True, unique=True)
     email = Column(String(255), nullable=False, unique=True)

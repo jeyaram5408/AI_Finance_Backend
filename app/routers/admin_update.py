@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.dependencies.auth_dependency import require_admin
 from app.dependencies.db import get_db
 from app.models.user_table_model import UserTableClass
-from app.dependencies.auth_dependency import require_admin
+
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -38,7 +39,12 @@ async def update_role(
         raise HTTPException(status_code=400, detail=f"Allowed roles: {list(ALLOWED_ROLES)}")
 
     if user.role == role:
-        return {"success": True, "message": "Role already set", "user_id": user.id, "role": user.role}
+        return {
+            "success": True,
+            "message": "Role already set",
+            "user_id": user.id,
+            "role": user.role
+        }
 
     user.role = role
     await db.commit()

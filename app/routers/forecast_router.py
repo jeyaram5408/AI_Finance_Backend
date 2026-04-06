@@ -9,7 +9,9 @@ from app.services.forecast_service import get_monthly_expenses, calculate_foreca
 router = APIRouter(prefix="/forecast", tags=["Forecast"])
 
 
-@router.get("/")
+from app.schemas.forecast_schema import ForecastResponse
+
+@router.get("/", response_model=ForecastResponse)
 async def get_forecast(
     db: AsyncSession = Depends(get_db),
     current_user: UserTableClass = Depends(get_current_user),

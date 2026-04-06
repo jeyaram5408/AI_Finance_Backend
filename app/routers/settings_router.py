@@ -24,7 +24,7 @@ async def get_or_create_settings(db: AsyncSession, current_user: UserTableClass)
         now = datetime.utcnow()
         settings = UserSettingsClass(
             user_id=current_user.id,
-            default_currency="USD",
+            currency="INR",
             monthly_budget=None,
             email_notifications=True,
             push_notifications=False,
@@ -44,7 +44,7 @@ def build_settings_response(user: UserTableClass, settings: UserSettingsClass):
         "name": user.name,
         "email": user.email,
         "phone_number": user.phone_number,
-        "default_currency": settings.default_currency,
+        "currency": settings.currency,
         "monthly_budget": settings.monthly_budget,
         "email_notifications": settings.email_notifications,
         "push_notifications": settings.push_notifications,
@@ -123,8 +123,8 @@ async def update_my_settings(
             current_user.password = hash_password(update_data["password"])
 
         # ---------------- SETTINGS TABLE ----------------
-        if "default_currency" in update_data and update_data["default_currency"] is not None:
-            settings.default_currency = update_data["default_currency"]
+        if "currency" in update_data and update_data["currency"] is not None:
+            settings.currency = update_data["currency"]
 
         if "monthly_budget" in update_data:
             settings.monthly_budget = update_data["monthly_budget"]
