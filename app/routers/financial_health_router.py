@@ -10,8 +10,8 @@ from sqlalchemy import select
 from collections import defaultdict
 from statistics import pstdev
 from datetime import datetime
+from google import genai
 
-import google.generativeai as genai
 import os
 import json
 import re
