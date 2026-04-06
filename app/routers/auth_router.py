@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Form
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi.concurrency import run_in_threadpool
 
 from google.oauth2 import id_token
 from google.auth.transport import requests
@@ -113,8 +114,7 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
     new_user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
 
     await db.commit()
-    await send_otp_email(new_user.email, otp)
-
+    await run_in_threadpool(send_otp_email, new_user.email, otp)
     return {
         "success": True,
         "message": "OTP sent to your email"
@@ -131,7 +131,7 @@ async def verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
     if not verify_password(data.otp, user.otp_code):
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
-    if not user.otp_expiry or datetime.utcnow() > user.otp_expiry:
+    if not user.otp_expiry or datetime.now(timezone.utc) > user.otp_expiry:
         raise HTTPException(status_code=400, detail="OTP expired")
 
     user.is_active = True
@@ -202,7 +202,7 @@ async def google_login(data: dict, db: AsyncSession = Depends(get_db)):
             )
             db.add(user)
             await db.flush()
-            user.user_id = f"AFA{user.id:02d}"
+            user.user_id = f"AFA{user.id:06d}"
             await db.commit()
             await db.refresh(user)
 
@@ -243,7 +243,7 @@ async def refresh_token(
     if not session:
         raise HTTPException(status_code=401, detail="Refresh token not recognized")
 
-    if session.expires_at < datetime.utcnow():
+    if session.expires_at < datetime.now(timezone.utc):
         session.is_revoked = True
         await db.commit()
         raise HTTPException(status_code=401, detail="Refresh token expired")
@@ -306,9 +306,10 @@ async def resend_otp(email: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail="User already verified")
 
     otp = generate_otp()
-    user.otp_code = otp
-    user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
-    user.updated_at = datetime.utcnow()
+    user.otp_code = hash_password(otp)
+    user.otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=5)
+    user.updated_at = datetime.now(timezone.utc)
+    await run_in_threadpool(send_otp_email, user.email, otp)
 
     await db.commit()
     await send_otp_email(user.email, otp)
@@ -327,9 +328,11 @@ async def forgot_password(data: ForgotPasswordRequest, db: AsyncSession = Depend
         raise HTTPException(status_code=404, detail="User not found")
 
     otp = generate_otp()
-    user.otp_code = otp
-    user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
-    user.updated_at = datetime.utcnow()
+    user.otp_code = hash_password(otp)
+    user.otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=5)
+    user.updated_at = datetime.now(timezone.utc)
+
+    await run_in_threadpool(send_otp_email, user.email, otp)
 
     await db.commit()
     await send_otp_email(user.email, otp)
@@ -347,16 +350,16 @@ async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if user.otp_code != data.otp:
+    if not verify_password(data.otp, user.otp_code):
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
-    if not user.otp_expiry or user.otp_expiry < datetime.utcnow():
+    if not user.otp_expiry or user.otp_expiry < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="OTP expired")
 
     user.password = hash_password(data.new_password)
     user.otp_code = None
     user.otp_expiry = None
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
 
     await db.commit()
 
