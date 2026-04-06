@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any
-import os ,uuid
+import os ,uuid , hmac
 import secrets
 
 from jose import jwt, JWTError, ExpiredSignatureError
@@ -43,6 +43,14 @@ def verify_password(plain_password: str, hashed_password: str | None) -> bool:
 
 def generate_otp() -> str:
     return str(secrets.randbelow(900000) + 100000)
+
+def verify_otp(plain_otp: str, hashed_otp: str) -> bool:
+    if not hashed_otp:
+        return False
+    try:
+        return pwd_context.verify(plain_otp, hashed_otp)
+    except Exception:
+        return False
 
 
 def _build_token_payload(data: dict[str, Any], expires_delta: timedelta, token_type: str) -> dict[str, Any]:

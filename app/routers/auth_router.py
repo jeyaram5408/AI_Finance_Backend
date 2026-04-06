@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Form
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.concurrency import run_in_threadpool
-
+from app.core.security import verify_otp
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
@@ -148,7 +148,6 @@ async def verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # ✅ FIX: define otp_expiry properly
     otp_expiry = user.otp_expiry
 
     if otp_expiry and otp_expiry.tzinfo is None:
@@ -157,7 +156,7 @@ async def verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
     if not otp_expiry or datetime.now(timezone.utc) > otp_expiry:
         raise HTTPException(status_code=400, detail="OTP expired")
 
-    if not verify_password(data.otp, user.otp_code):
+    if not user.otp_code or not verify_password(data.otp, user.otp_code):
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
     user.is_active = True
