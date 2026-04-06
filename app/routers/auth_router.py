@@ -159,7 +159,7 @@ async def verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
     if not user.otp_code:
         raise HTTPException(status_code=400, detail="OTP not found")    
 
-    if not user.otp_code or not verify_password(data.otp, user.otp_code):
+    if not user.otp_code or not verify_otp(data.otp, user.otp_code):
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
     user.is_active = True
@@ -402,6 +402,9 @@ async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(
 
     if not user.otp_expiry or datetime.now(timezone.utc) > user.otp_expiry:
         raise HTTPException(status_code=400, detail="OTP expired")
+
+    if not user.otp_code:
+        raise HTTPException(status_code=400, detail="OTP not found")
 
     if not verify_otp(data.otp, user.otp_code):
         raise HTTPException(status_code=400, detail="Invalid OTP")

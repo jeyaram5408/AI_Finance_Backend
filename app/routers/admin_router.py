@@ -148,10 +148,10 @@ async def create_admin(
     await db.flush()
 
 # user_id (already)
-    new_admin.user_id = f"AFA{new_admin.id:02d}"
+    new_admin.user_id = f"AFA{new_admin.id:06d}"
 
 # ✅ admin_code
-    new_admin.admin_code = f"ADM{new_admin.id:02d}"
+    new_admin.admin_code = f"ADM{new_admin.id:06d}"
     await db.commit()
     await db.refresh(new_admin)
 
