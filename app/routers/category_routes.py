@@ -14,7 +14,7 @@ from app.models.user_table_model import UserTableClass
 router = APIRouter(prefix="/categories", tags=["Categories"])
 
 
-@router.post("/", response_model=CategoryResponse)
+@router.post("", response_model=CategoryResponse)
 async def create_category(
     data: CategoryCreate,
     db: AsyncSession = Depends(get_db),
@@ -22,7 +22,7 @@ async def create_category(
 ):
     return await crud.create_category(db, data, current_user)
 
-@router.get("/", response_model=List[CategoryResponse])
+@router.get("", response_model=List[CategoryResponse])
 async def get_all_categories(
     db: AsyncSession = Depends(get_db),
     current_user: UserTableClass = Depends(get_current_user)
