@@ -17,11 +17,16 @@ from app.core.security import (
     decode_refresh_token,
     generate_otp,
 )
+
 from app.dependencies.db import get_db
 from app.models.refresh_token_model import RefreshSession
 from app.models.user_table_model import UserTableClass
 from app.schemas.user_schemas import UserCreate, OTPVerify
-from app.schemas.auth_schemas import UserLogin, ForgotPasswordRequest, ResetPasswordRequest
+from app.schemas.auth_schemas import (
+    UserLogin,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+)
 from app.utils.email_service import send_otp_email
 
 
@@ -30,13 +35,12 @@ router = APIRouter(prefix="/authentication", tags=["Authentication"])
 CLIENT_ID = os.getenv("CLIENT_ID")
 
 
-
-
-
+# -------------------- HELPERS --------------------
 
 async def get_user_by_email(db: AsyncSession, email: str):
+    email = email.lower().strip()
     result = await db.execute(
-        select(UserTableClass).where(UserTableClass.email == email.lower())
+        select(UserTableClass).where(UserTableClass.email == email)
     )
     return result.scalar_one_or_none()
 
@@ -47,7 +51,9 @@ async def create_refresh_session(db: AsyncSession, user: UserTableClass, refresh
     if not token_data.jti or token_data.exp is None:
         raise HTTPException(status_code=401, detail="Invalid refresh token payload")
 
-    expires_at = datetime.fromtimestamp(token_data.exp, tz=timezone.utc).replace(tzinfo=None)
+    expires_at = datetime.fromtimestamp(
+        token_data.exp, tz=timezone.utc
+    ).replace(tzinfo=None)
 
     session = RefreshSession(
         user_id=user.id,
@@ -61,7 +67,7 @@ async def create_refresh_session(db: AsyncSession, user: UserTableClass, refresh
 
 async def issue_tokens(db: AsyncSession, user: UserTableClass):
     payload = {
-        "user_id": str( user.id),
+        "user_id": str(user.id),
         "email": user.email,
         "name": user.name,
         "role": user.role or "user",
@@ -75,13 +81,18 @@ async def issue_tokens(db: AsyncSession, user: UserTableClass):
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
     }
 
 
+# -------------------- REGISTER --------------------
+
 @router.post("/register")
 async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
-    email = user.email.lower().strip()
+
+    # FIXED EMAIL BUG
+    user.email = user.email.lower().strip()
+    email = user.email
 
     existing = await get_user_by_email(db, email)
     if existing:
@@ -90,15 +101,15 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
     if not user.password:
         raise HTTPException(status_code=400, detail="Password required")
 
-   
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
+
     new_user = UserTableClass(
         role="user",
         name=user.name.strip(),
         email=email,
         password=hash_password(user.password),
         provider="local",
-        is_active=True,
+        is_active=False,
         is_verified=False,
         created_at=now,
         updated_at=now,
@@ -107,50 +118,62 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
     db.add(new_user)
     await db.flush()
 
-    new_user.user_id = f"AFA{new_user.id:02d}"
+    new_user.user_id = f"AFA{new_user.id:06d}"
 
+    # OTP GENERATION (single commit fix)
     otp = generate_otp()
     new_user.otp_code = hash_password(otp)
-    new_user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
+    new_user.otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=5)
 
     await db.commit()
+    await db.refresh(new_user)
+
     await run_in_threadpool(send_otp_email, new_user.email, otp)
+
     return {
         "success": True,
-        "message": "OTP sent to your email"
+        "message": "OTP sent to your email",
     }
 
 
+# -------------------- VERIFY OTP --------------------
+
 @router.post("/verify-otp")
 async def verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
+
+    data.email = data.email.lower().strip()
+
     user = await get_user_by_email(db, data.email)
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if not verify_password(data.otp, user.otp_code):
-        raise HTTPException(status_code=400, detail="Invalid OTP")
-
+    # FIXED ORDER (expiry first)
     if not user.otp_expiry or datetime.now(timezone.utc) > user.otp_expiry:
         raise HTTPException(status_code=400, detail="OTP expired")
+
+    if not verify_password(data.otp, user.otp_code):
+        raise HTTPException(status_code=400, detail="Invalid OTP")
 
     user.is_active = True
     user.is_verified = True
     user.otp_code = None
     user.otp_expiry = None
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(timezone.utc)
 
     await db.commit()
 
-    return {
-        "success": True,
-        "message": "OTP verified successfully"
-    }
+    return {"success": True, "message": "OTP verified successfully"}
 
+
+# -------------------- LOGIN --------------------
 
 @router.post("/login")
 async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
-    user = await get_user_by_email(db, data.email.lower())
+
+    data.email = data.email.lower().strip()
+
+    user = await get_user_by_email(db, data.email)
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -159,7 +182,7 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=403, detail="User is deactivated")
 
     if not user.is_verified:
-        raise HTTPException(status_code=403, detail="Please verify your email before login")
+        raise HTTPException(status_code=403, detail="Please verify your email")
 
     if not user.password or not verify_password(data.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
@@ -167,8 +190,11 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
     return await issue_tokens(db, user)
 
 
+# -------------------- GOOGLE LOGIN --------------------
+
 @router.post("/google")
 async def google_login(data: dict, db: AsyncSession = Depends(get_db)):
+
     if not CLIENT_ID:
         raise HTTPException(status_code=500, detail="Google login not configured")
 
@@ -176,7 +202,7 @@ async def google_login(data: dict, db: AsyncSession = Depends(get_db)):
         idinfo = id_token.verify_oauth2_token(
             data["token"],
             requests.Request(),
-            CLIENT_ID
+            CLIENT_ID,
         )
 
         email = idinfo.get("email")
@@ -185,14 +211,17 @@ async def google_login(data: dict, db: AsyncSession = Depends(get_db)):
         if not email:
             raise HTTPException(status_code=400, detail="Email not available")
 
+        email = email.lower().strip()
+
         user = await get_user_by_email(db, email)
 
         if not user:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
+
             user = UserTableClass(
                 role="user",
                 name=name,
-                email=email.lower(),
+                email=email,
                 password=None,
                 provider="google",
                 is_active=True,
@@ -200,36 +229,39 @@ async def google_login(data: dict, db: AsyncSession = Depends(get_db)):
                 created_at=now,
                 updated_at=now,
             )
+
             db.add(user)
             await db.flush()
+
             user.user_id = f"AFA{user.id:06d}"
+
             await db.commit()
             await db.refresh(user)
 
         if not user.is_active:
             raise HTTPException(status_code=403, detail="User is deactivated")
 
-        if not user.is_verified:
-            user.is_verified = True
-            await db.commit()
-
         return await issue_tokens(db, user)
 
-    except HTTPException:
-        raise
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid Google token")
 
 
+# -------------------- REFRESH TOKEN --------------------
+
 @router.post("/refresh")
 async def refresh_token(
     refresh_token: str = Form(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
+
     token_data = decode_refresh_token(refresh_token)
 
     if not token_data.user_id or not token_data.email or not token_data.jti:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
+
+    if not str(token_data.user_id).isdigit():
+        raise HTTPException(status_code=401, detail="Invalid token")
 
     result = await db.execute(
         select(RefreshSession).where(
@@ -238,6 +270,7 @@ async def refresh_token(
             RefreshSession.is_revoked == False,
         )
     )
+
     session = result.scalar_one_or_none()
 
     if not session:
@@ -248,13 +281,13 @@ async def refresh_token(
         await db.commit()
         raise HTTPException(status_code=401, detail="Refresh token expired")
 
-    user = await db.get(UserTableClass, token_data.user_id)
+    user = await db.get(UserTableClass, int(token_data.user_id))
 
     if not user or user.email.lower() != token_data.email.lower():
         raise HTTPException(status_code=401, detail="User not found")
 
     if not user.is_active:
-        raise HTTPException(status_code=403, detail="User is deactivated")
+        raise HTTPException(status_code=403, detail="User deactivated")
 
     if not user.is_verified:
         raise HTTPException(status_code=403, detail="User not verified")
@@ -265,10 +298,12 @@ async def refresh_token(
     return await issue_tokens(db, user)
 
 
+# -------------------- LOGOUT --------------------
+
 @router.post("/logout")
 async def logout(
     refresh_token: str = Form(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     try:
         token_data = decode_refresh_token(refresh_token)
@@ -281,7 +316,9 @@ async def logout(
                     RefreshSession.is_revoked == False,
                 )
             )
+
             session = result.scalar_one_or_none()
+
             if session:
                 session.is_revoked = True
                 await db.commit()
@@ -289,14 +326,16 @@ async def logout(
     except Exception:
         pass
 
-    return {
-        "success": True,
-        "message": "Logged out successfully"
-    }
+    return {"success": True, "message": "Logged out successfully"}
 
+
+# -------------------- RESEND OTP --------------------
 
 @router.post("/resend-otp")
 async def resend_otp(email: str, db: AsyncSession = Depends(get_db)):
+
+    email = email.lower().strip()
+
     user = await get_user_by_email(db, email)
 
     if not user:
@@ -306,55 +345,60 @@ async def resend_otp(email: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail="User already verified")
 
     otp = generate_otp()
+
     user.otp_code = hash_password(otp)
     user.otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=5)
     user.updated_at = datetime.now(timezone.utc)
-    await run_in_threadpool(send_otp_email, user.email, otp)
 
     await db.commit()
-    await send_otp_email(user.email, otp)
 
-    return {
-        "success": True,
-        "message": "OTP resent"
-    }
+    await run_in_threadpool(send_otp_email, user.email, otp)
 
+    return {"success": True, "message": "OTP resent"}
+
+
+# -------------------- FORGOT PASSWORD --------------------
 
 @router.post("/forgot-password")
 async def forgot_password(data: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
-    user = await get_user_by_email(db, data.email.lower())
+
+    data.email = data.email.lower().strip()
+
+    user = await get_user_by_email(db, data.email)
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     otp = generate_otp()
+
     user.otp_code = hash_password(otp)
     user.otp_expiry = datetime.now(timezone.utc) + timedelta(minutes=5)
     user.updated_at = datetime.now(timezone.utc)
 
+    await db.commit()
+
     await run_in_threadpool(send_otp_email, user.email, otp)
 
-    await db.commit()
-    await send_otp_email(user.email, otp)
+    return {"success": True, "message": "OTP sent for password reset"}
 
-    return {
-        "success": True,
-        "message": "OTP sent for password reset"
-    }
 
+# -------------------- RESET PASSWORD --------------------
 
 @router.post("/reset-password")
 async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
-    user = await get_user_by_email(db, data.email.lower())
+
+    data.email = data.email.lower().strip()
+
+    user = await get_user_by_email(db, data.email)
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    if not user.otp_expiry or datetime.now(timezone.utc) > user.otp_expiry:
+        raise HTTPException(status_code=400, detail="OTP expired")
+
     if not verify_password(data.otp, user.otp_code):
         raise HTTPException(status_code=400, detail="Invalid OTP")
-
-    if not user.otp_expiry or user.otp_expiry < datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="OTP expired")
 
     user.password = hash_password(data.new_password)
     user.otp_code = None
@@ -363,7 +407,4 @@ async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(
 
     await db.commit()
 
-    return {
-        "success": True,
-        "message": "Password reset successful"
-    }
+    return {"success": True, "message": "Password reset successful"}
