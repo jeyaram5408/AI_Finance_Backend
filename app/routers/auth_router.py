@@ -156,6 +156,9 @@ async def verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
     if not otp_expiry or datetime.now(timezone.utc) > otp_expiry:
         raise HTTPException(status_code=400, detail="OTP expired")
 
+    if not user.otp_code:
+        raise HTTPException(status_code=400, detail="OTP not found")    
+
     if not user.otp_code or not verify_password(data.otp, user.otp_code):
         raise HTTPException(status_code=400, detail="Invalid OTP")
 

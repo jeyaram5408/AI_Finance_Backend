@@ -38,8 +38,14 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str | None) -> bool:
     if not hashed_password:
         return False
-    return pwd_context.verify(plain_password, hashed_password)
+def verify_password(plain_password: str, hashed_password: str | None) -> bool:
+    if not hashed_password:
+        return False
 
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        return False
 
 def generate_otp() -> str:
     return str(secrets.randbelow(900000) + 100000)
