@@ -109,7 +109,7 @@ async def register(user: UserCreate, db: AsyncSession = Depends(get_db)):
     new_user.user_id = f"AFA{new_user.id:02d}"
 
     otp = generate_otp()
-    new_user.otp_code = otp
+    new_user.otp_code = hash_password(otp)
     new_user.otp_expiry = datetime.utcnow() + timedelta(minutes=5)
 
     await db.commit()
@@ -128,7 +128,7 @@ async def verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if user.otp_code != data.otp:
+    if not verify_password(data.otp, user.otp_code):
         raise HTTPException(status_code=400, detail="Invalid OTP")
 
     if not user.otp_expiry or datetime.utcnow() > user.otp_expiry:
@@ -217,7 +217,7 @@ async def google_login(data: dict, db: AsyncSession = Depends(get_db)):
 
     except HTTPException:
         raise
-    except Exception:
+    except ValueError:
         raise HTTPException(status_code=400, detail="Invalid Google token")
 
 

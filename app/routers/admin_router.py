@@ -1,7 +1,7 @@
 from datetime import datetime
 from collections import defaultdict
 from passlib.context import CryptContext
-
+import os
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select, func, or_, desc
@@ -118,7 +118,10 @@ async def create_admin(
     secret_key: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if secret_key != "my_super_secret_123":
+    
+    ADMIN_SECRET = os.getenv("ADMIN_SECRET")
+
+    if secret_key != ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     result = await db.execute(
