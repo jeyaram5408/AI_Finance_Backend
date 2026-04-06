@@ -10,6 +10,7 @@ from sqlalchemy import select
 from collections import defaultdict
 from statistics import pstdev
 from datetime import datetime
+
 from google import genai
 
 import os
@@ -25,8 +26,10 @@ api_key = os.getenv("GEMINI_API_KEY")
 if not api_key:
     raise ValueError("GEMINI_API_KEY not set in environment variables")
 
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel("gemini-1.5-flash")
+# genai.configure(api_key=api_key)response = model.generate_content(prompt)
+
+# model = genai.GenerativeModel("gemini-1.5-flash")
+client = genai.Client(api_key=api_key)
 
 # ─────────────────────────────────────────────────────────────
 # CATEGORY RULES
@@ -151,8 +154,7 @@ def compute_financial_health(
     savings_goal: float | None,
     monthly_expense_series: list[float] | None = None,
 ):
-    income = transaction_income if transaction_income > 0 else (profile_income or 0)
-
+    income = max(transaction_income, profile_income, 0)
     savings = income - expense
     savings_rate = round((savings / income * 100), 1) if income > 0 else 0
     expense_ratio = round((expense / income * 100), 1) if income > 0 else 100
@@ -453,7 +455,10 @@ Rules:
     }
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt
+        )      
         raw = response.text.strip()
         parsed = extract_json(raw)
 
