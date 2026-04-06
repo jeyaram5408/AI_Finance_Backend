@@ -1,6 +1,6 @@
 import os
-from datetime import datetime, timedelta, timezone
-
+from datetime import datetime, timedelta
+from datetime import timezone
 from fastapi import APIRouter, Depends, HTTPException, Form
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -147,9 +147,13 @@ async def verify_otp(data: OTPVerify, db: AsyncSession = Depends(get_db)):
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    if otp_expiry and otp_expiry.tzinfo is None:
+        otp_expiry = otp_expiry.replace(tzinfo=timezone.utc)
+    
 
-    # FIXED ORDER (expiry first)
-    if not user.otp_expiry or datetime.now(timezone.utc) > user.otp_expiry:
+        # FIXED ORDER (expiry first)
+    if not otp_expiry or datetime.now(timezone.utc) > otp_expiry:
         raise HTTPException(status_code=400, detail="OTP expired")
 
     if not verify_password(data.otp, user.otp_code):
