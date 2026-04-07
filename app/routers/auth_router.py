@@ -8,7 +8,6 @@ from fastapi.concurrency import run_in_threadpool
 from app.core.security import verify_otp
 from google.oauth2 import id_token
 from google.auth.transport import requests
-from app.utils.time_utils import utc_now
 
 from app.core.security import (
     hash_password,
