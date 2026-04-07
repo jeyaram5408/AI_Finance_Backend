@@ -106,6 +106,8 @@ Return valid JSON only.
 
 Rules:
 - Exactly 5 suggestions
+- Avoid generic advice like "save more"
+- Suggestions must be actionable and measurable
 - Sort by priority: high → medium → low
 - high   = saves more than ₹1000/month
 - medium = saves ₹500–₹1000/month
@@ -123,7 +125,7 @@ def _generate_with_gemini(prompt: str) -> AIResponseSchema:
     Sync helper; call via asyncio.to_thread from async code.
     """
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-2.0-flash",
         contents=prompt,
         config={
             "temperature": 0.5,
@@ -303,8 +305,10 @@ async def generate_ai_suggestions(db: AsyncSession, user_id: int):
 
     # 5) Call Gemini with structured output
     try:
-        ai_data = await asyncio.to_thread(_generate_with_gemini, prompt)
-
+        ai_data = await asyncio.wait_for(
+            asyncio.to_thread(_generate_with_gemini, prompt),
+            timeout=12
+)
         suggestions = ai_data.suggestions[:5]
         priority_order = {"high": 1, "medium": 2, "low": 3}
         suggestions.sort(key=lambda x: priority_order.get(x.priority, 3))
