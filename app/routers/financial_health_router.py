@@ -46,6 +46,9 @@ NEEDS_KEYWORDS = {
     "transport", "internet", "wifi", "education", "school", "college",
     "hospital", "utility", "utilities",
 }
+EMERGENCY_KEYWORDS = {
+    "medical", "hospital", "emergency", "surgery", "accident"
+}
 
 
 # ─────────────────────────────────────────────────────────────
@@ -66,6 +69,9 @@ def score_to_label(score: int):
         return "Poor"
     return "Critical"
 
+def is_emergency_category(cat: str) -> bool:
+    cat = normalize_category(cat)
+    return any(keyword in cat for keyword in EMERGENCY_KEYWORDS)
 
 def normalize_category(cat: str) -> str:
     return (cat or "other").strip().lower()
@@ -154,11 +160,28 @@ def compute_financial_health(
     savings_goal: float | None,
     monthly_expense_series: list[float] | None = None,
 ):
+    # Step 1: calculate category splits
+    wants_total = 0
+    needs_total = 0
+    emergency_expense = 0
+
+    for cat, amt in category_map.items():
+        if is_emergency_category(cat):
+            emergency_expense += amt
+        elif is_wants_category(cat):
+            wants_total += amt
+        elif is_needs_category(cat):
+            needs_total += amt
+
+    # Step 2: DEFINE effective_expense FIRST ✅
+    effective_expense = expense - emergency_expense
+    effective_expense = max(effective_expense, 0)
+
+    # Step 3: THEN use it ✅
     income = max(transaction_income, profile_income, 0)
     savings = income - expense
     savings_rate = round((savings / income * 100), 1) if income > 0 else 0
-    expense_ratio = round((expense / income * 100), 1) if income > 0 else 100
-
+    expense_ratio = round((effective_expense / income * 100), 1) if income > 0 else 100
     # 1) Savings Rate Score /30
     if savings_rate >= 30:
         savings_rate_score = 30
@@ -186,32 +209,36 @@ def compute_financial_health(
     top_category_amount = 0
     top_category_share = 0
 
-    if expense > 0 and category_map:
-        top_category, top_category_amount = max(category_map.items(), key=lambda x: x[1])
-        top_category_share = round((top_category_amount / expense) * 100, 1)
+    filtered_categories = {
+        cat: amt for cat, amt in category_map.items()
+        if not is_emergency_category(cat)
+    }
 
-    if top_category_share <= 25:
-        category_score = 15
-    elif top_category_share <= 40:
-        category_score = 11
-    elif top_category_share <= 55:
-        category_score = 6
+    if effective_expense > 0 and filtered_categories:
+        top_category, top_category_amount = max(filtered_categories.items(), key=lambda x: x[1])
+        top_category_share = round((top_category_amount / effective_expense) * 100, 1)
+    if not filtered_categories:
+        category_score = 10   # neutral score
     else:
-        category_score = 2
+        if top_category_share <= 25:
+            category_score = 15
+        elif top_category_share <= 40:
+            category_score = 11
+        elif top_category_share <= 55:
+            category_score = 6
+        else:
+            category_score = 2
 
     # 4) Wants Overspend Score /15
-    wants_total = 0
-    needs_total = 0
+  
 
-    for cat, amt in category_map.items():
-        if is_wants_category(cat):
-            wants_total += amt
-        elif is_needs_category(cat):
-            needs_total += amt
-
-    wants_ratio = round((wants_total / expense) * 100, 1) if expense > 0 else 0
-    needs_ratio = round((needs_total / expense) * 100, 1) if expense > 0 else 0
-
+      
+    if effective_expense <= 0:
+        wants_ratio = 0
+        needs_ratio = 0
+    else:
+        wants_ratio = round((wants_total / effective_expense) * 100, 1)
+        needs_ratio = round((needs_total / effective_expense) * 100, 1)
     if wants_ratio <= 20:
         wants_score = 15
     elif wants_ratio <= 35:
@@ -240,8 +267,12 @@ def compute_financial_health(
         goal_score = 5
 
     # 6) Expense Stability /10
-    stability_score, expense_volatility = compute_stability_score(monthly_expense_series or [])
+    adjusted_series = [
+        max(val * 0.8, 0)  # basic approximation removing spike effect
+        for val in (monthly_expense_series or [])
+    ]
 
+    stability_score, expense_volatility = compute_stability_score(adjusted_series)
     base_score = (
         savings_rate_score
         + expense_control_score
@@ -443,6 +474,9 @@ Rules:
 - Use actual category names where relevant
 - Keep suggestions practical and specific
 - No markdown, return pure JSON only
+- Do NOT suggest reducing medical, hospital, or emergency expenses
+- Treat emergency expenses as unavoidable
+- Focus only on controllable spending
 """
 
     ai_data = {
@@ -459,7 +493,7 @@ Rules:
             model="gemini-1.5-flash",
             contents=prompt
         )      
-        raw = response.text.strip()
+        raw = (response.text or "").strip()
         parsed = extract_json(raw)
 
         if isinstance(parsed, dict):
