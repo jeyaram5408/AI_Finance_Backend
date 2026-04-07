@@ -53,7 +53,7 @@ async def add_admin_log(
 ):
     log = AdminLog(
         admin_id = admin.id    ,   
-        admin_code=admin.admin_code,
+        admin_code=admin.admin_code or f"ADM{admin.id:06d}",
         action=action,
         target_type=target_type,
         target_id=target_id,
