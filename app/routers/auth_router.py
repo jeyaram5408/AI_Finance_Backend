@@ -8,6 +8,7 @@ from fastapi.concurrency import run_in_threadpool
 from app.core.security import verify_otp
 from google.oauth2 import id_token
 from google.auth.transport import requests
+from app.utils.time_utils import utc_now
 
 from app.core.security import (
     hash_password,
@@ -400,7 +401,7 @@ async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if not user.otp_expiry or datetime.now(timezone.utc) > user.otp_expiry:
+    if not user.otp_expiry or datetime.utcnow() > user.otp_expiry:
         raise HTTPException(status_code=400, detail="OTP expired")
 
     if not user.otp_code:
